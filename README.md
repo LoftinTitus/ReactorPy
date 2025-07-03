@@ -19,21 +19,6 @@ ReactorPy lets you define, simulate, and analyze **CSTR**, **batch**, **PFR**, a
 
 ---
 
-## Example
-
-```python
-from reactorpy import Reactor, Reaction, Species
-
-A = Species("A", initial=1.0)  # mol/L
-B = Species("B", initial=2.0)
-C = Species("C", initial=0.0)
-
-r1 = Reaction("A + B -> C", rate="k * A * B", parameters={"k": 0.5})
-rxn = Reactor(type="batch", reactions=[r1], species=[A, B, C])
-
-t, results = rxn.simulate(time=10)
-rxn.plot()
-
 ## To-do List
 
 - [ ] Core API for `Species`, `Reaction`, and `Reactor`
@@ -49,3 +34,19 @@ rxn.plot()
 - [ ] Export capability (CSV, LaTeX, etc.)
 - [ ] Develop simple CLI or Jupyter-based UI
 - [ ] Integrate with ThermoProps for enthalpy/heat balance
+
+## Example
+
+```python
+from reactorpy import Reactor, Reaction, Species
+
+A = Species("A", initial=1.0)  # mol/L
+B = Species("B", initial=2.0)
+C = Species("C", initial=0.0)
+
+r1 = Reaction("A + B -> C", rate="k * A * B", parameters={"k": 0.5})
+rxn = Reactor(type="batch", reactions=[r1], species=[A, B, C])
+
+t, results = rxn.simulate(time=10)
+rxn.plot()
+
