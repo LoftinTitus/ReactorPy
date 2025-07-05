@@ -21,19 +21,18 @@ ReactorPy lets you define, simulate, and analyze **CSTR**, **batch**, **PFR**, a
 
 ## To-do List
 
-- [ ] Core API for `Species`, `Reaction`, and `Reactor`
-- [ ] Implement batch reactor model
-- [ ] Add CSTR model (steady-state and dynamic)
-- [ ] Add PFR model (1D spatial discretization)
-- [ ] Parse symbolic rate expressions using SymPy
-- [ ] Implement numerical ODE solver backend (SciPy)
-- [ ] Optional: Add JAX or Numba backend for speed
-- [ ] Create unit integration using Pint
-- [ ] Add plotting for concentration vs. time/space
-- [ ] Build JSON/DSL model input format
-- [ ] Export capability (CSV, LaTeX, etc.)
+- [X] Core for `Species`, `Reaction`, and `Reactor`
+- [X] Implement batch reactor model
+- [X] Add CSTR model (steady-state and dynamic)
+- [X] Add PFR model (1D spatial discretization)
+- [X] Parse symbolic rate expressions using SymPy
+- [X] Implement numerical ODE solver backend (SciPy)
+- [X] Create unit integration using Pint
+- [X] Add plotting for concentration vs. time/space
+- [X] Build JSON/DSL model input format
+- [X] Export capability (CSV, PDF, etc.)
 - [ ] Develop simple CLI or Jupyter-based UI
-- [ ] Integrate with ThermoProps for enthalpy/heat balance
+- [ ] Integrate with Thermsolve for enthalpy/heat balance
 
 ## Example
 
