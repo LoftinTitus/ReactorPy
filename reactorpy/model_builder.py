@@ -47,42 +47,46 @@ class ModelBuilder:
     def parse_rate_expression(self, rate_expression, rate_parameters=None):
         """
         Parse a rate expression string into a SymPy expression.
-        
+
         Args:
             rate_expression (str): Rate expression like "k * [A] * [B]" or "k1 * [A]^2 - k2 * [C]"
             rate_parameters (dict): Dictionary of rate parameters
-            
+
         Returns:
             sympy.Expr: Symbolic rate expression
         """
         if not rate_expression:
             return sp.sympify(0)
-        
-        # Create a copy of the expression to modify
-        expr_str = rate_expression
-        
-        # Find all concentration terms [species] and replace with symbols
+
+        # Create a local dictionary for sympify to use
+        local_dict = {}
+
+        # Find all concentration terms [species] and create symbols for them
         concentration_pattern = r'\[([A-Za-z][A-Za-z0-9_]*)\]'
-        species_matches = re.findall(concentration_pattern, expr_str)
-        
+        species_matches = re.findall(concentration_pattern, rate_expression)
+
         for species in species_matches:
             concentration_symbol = self.create_concentration_symbol(species)
-            # Replace [species] with the symbol name
-            expr_str = expr_str.replace(f'[{species}]', str(concentration_symbol))
-        
-        # Find all parameter names and create symbols
+            # Use a simple variable name for parsing, without brackets
+            local_dict[f'conc_{species}'] = concentration_symbol
+
+        # Find all parameter names and create symbols for them
         if rate_parameters:
             for param_name in rate_parameters.keys():
-                if param_name in expr_str:
+                if param_name in rate_expression:
                     param_symbol = self.create_parameter_symbol(param_name)
-                    # Use word boundaries to avoid partial replacements
-                    expr_str = re.sub(rf'\b{param_name}\b', str(param_symbol), expr_str)
-        
+                    local_dict[param_name] = param_symbol
+
+        # Replace [species] with simple variable names for parsing
+        expr_str = rate_expression
+        for species in species_matches:
+            expr_str = expr_str.replace(f'[{species}]', f'conc_{species}')
+
         # Convert ^ to ** for SymPy
         expr_str = expr_str.replace('^', '**')
-        
+
         try:
-            symbolic_expr = sp.sympify(expr_str)
+            symbolic_expr = sp.sympify(expr_str, locals=local_dict)
             return symbolic_expr
         except Exception as e:
             raise ValueError(f"Could not parse rate expression '{rate_expression}': {e}")
