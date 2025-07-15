@@ -185,8 +185,13 @@ class ModelBuilder:
         """
         species_names = list(ode_system.keys())
         
-        # Create concentration vector
-        concentration_vector = [self.concentration_symbols[name] for name in species_names]
+        # Create concentration vector - ensure all species have symbols
+        concentration_vector = []
+        for name in species_names:
+            # Create symbol if it doesn't exist
+            if name not in self.concentration_symbols:
+                self.create_concentration_symbol(name)
+            concentration_vector.append(self.concentration_symbols[name])
         
         # Create ODE vector
         ode_vector = [ode_system[name] for name in species_names]
