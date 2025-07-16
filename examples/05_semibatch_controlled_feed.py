@@ -103,7 +103,7 @@ def main():
         """Define composition of feed stream"""
         return {"B": feed_concentration_B}  # Only B in feed
     
-    reactor_fast.set_feed_schedule(fast_feed_schedule)
+    reactor_fast.feed_schedule(fast_feed_schedule)
     reactor_fast.set_feed_composition(feed_composition)
     
     # Simulate
