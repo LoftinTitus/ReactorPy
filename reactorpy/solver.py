@@ -54,19 +54,24 @@ class ODESolver:
         for param_name, param_value in rate_parameters.items():
             if param_name in self.parameter_symbols:
                 parameter_substitutions[self.parameter_symbols[param_name]] = param_value
-        
-        # Substitute parameter values into expressions
+         # Substitute parameter values into expressions and simplify
         substituted_expressions = []
         for expr in self.ode_expressions:
             substituted_expr = expr.subs(parameter_substitutions)
-            substituted_expressions.append(substituted_expr)
-        
+            # Simplify the expression to reduce complexity
+            try:
+                simplified_expr = sp.simplify(substituted_expr)
+                substituted_expressions.append(simplified_expr)
+            except Exception:
+                # If simplification fails, use the original substituted expression
+                substituted_expressions.append(substituted_expr)
+
         # Lambdify each ODE expression
         self.lambdified_functions = {}
         for i, (species_name, expr) in enumerate(zip(self.species_names, substituted_expressions)):
             try:
                 # Create lambdified function that takes concentration vector and returns rate
-                func = sp.lambdify(self.concentration_vector, expr, modules=['numpy'])
+                func = sp.lambdify(self.concentration_vector, expr, modules=['numpy'], cse=True)
                 self.lambdified_functions[species_name] = func
             except Exception as e:
                 warnings.warn(f"Could not lambdify expression for {species_name}: {e}")
@@ -110,7 +115,18 @@ class ODESolver:
                     func = self.lambdified_functions[species_name]
                     try:
                         # Call the lambdified function with current concentrations
-                        dydt[i] = func(*y_safe)
+                        result = func(*y_safe)
+                        
+                        # Check if result is finite and can be converted to float
+                        if np.isfinite(result) and not np.isnan(result):
+                            dydt[i] = float(result)
+                        else:
+                            # If result is infinite or NaN, use zero
+                            dydt[i] = 0.0
+                            
+                    except (ValueError, TypeError, OverflowError) as e:
+                        # Handle specific numerical errors more gracefully
+                        dydt[i] = 0.0
                     except Exception as e:
                         warnings.warn(f"Error evaluating ODE for {species_name} at t={t}: {e}")
                         dydt[i] = 0.0
@@ -249,6 +265,8 @@ def solve_steady_state(symbolic_odes: Dict[str, sp.Expr],
                       parameter_symbols: Dict[str, sp.Symbol] = None,
                       method: str = 'hybr',
                       tol: float = 1e-6,
+                      total_mass: float = None,
+                      use_mass_conservation: bool = True,
                       **kwargs) -> Dict:
     """
     Solve for steady-state concentrations by setting all derivatives to zero.
@@ -261,6 +279,8 @@ def solve_steady_state(symbolic_odes: Dict[str, sp.Expr],
         parameter_symbols: Dictionary mapping parameter names to parameter symbols
         method: Root finding method ('hybr', 'lm', 'broyden1', etc.)
         tol: Tolerance for convergence
+        total_mass: Optional total mass constraint (sum of all concentrations)
+        use_mass_conservation: Whether to use mass conservation as a constraint
         **kwargs: Additional arguments passed to scipy.optimize.root
         
     Returns:
@@ -283,6 +303,10 @@ def solve_steady_state(symbolic_odes: Dict[str, sp.Expr],
     solver.prepare_system(symbolic_odes, concentration_symbols, parameter_symbols)
     solver.lambdify_system(rate_parameters)
     
+    # Calculate total mass if not provided (sum of initial guess)
+    if total_mass is None:
+        total_mass = sum(initial_guess.values())
+    
     # Initial guess vector
     x0 = np.array([initial_guess[species] for species in species_names])
     
@@ -290,13 +314,34 @@ def solve_steady_state(symbolic_odes: Dict[str, sp.Expr],
         """Function that should equal zero at steady state."""
         x_safe = np.maximum(x, 0.0)  # Prevent negative concentrations
         
-        equations = np.zeros_like(x)
-        for i, species_name in enumerate(species_names):
-            func = solver.lambdified_functions[species_name]
-            try:
-                equations[i] = func(*x_safe)
-            except Exception:
-                equations[i] = 0.0
+        n_species = len(species_names)
+        
+        if use_mass_conservation and total_mass is not None and n_species > 1:
+            # Use n-1 ODE equations + mass conservation constraint
+            # This avoids over-constraining the system
+            equations = np.zeros(n_species)
+            
+            # First n_species-1 equations: ODE derivatives = 0
+            for i in range(n_species - 1):
+                species_name = species_names[i]
+                func = solver.lambdified_functions[species_name]
+                try:
+                    equations[i] = func(*x_safe)
+                except Exception:
+                    equations[i] = 0.0
+            
+            # Last equation: mass conservation constraint
+            equations[n_species - 1] = np.sum(x_safe) - total_mass
+            
+        else:
+            # Use all ODE equations (derivatives = 0)
+            equations = np.zeros_like(x)
+            for i, species_name in enumerate(species_names):
+                func = solver.lambdified_functions[species_name]
+                try:
+                    equations[i] = func(*x_safe)
+                except Exception:
+                    equations[i] = 0.0
         
         return equations
     

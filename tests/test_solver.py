@@ -280,11 +280,27 @@ class TestSolveSteadyState(unittest.TestCase):
         self.rate_parameters = {'k1': 0.1, 'k2': 0.05}
 
     def test_solve_steady_state_basic(self):
-        """Test basic steady-state solving."""
+        """Test basic steady-state solving with mass conservation."""
+        # Calculate total mass from initial guess
+        total_mass = sum(self.initial_guess.values())  # 0.5 + 0.5 = 1.0
+        
+        # Define symbol dictionaries for proper symbol matching
+        concentration_symbols = {
+            'A': self.A_symbol,
+            'B': self.B_symbol
+        }
+        parameter_symbols = {
+            'k1': self.k1_symbol,
+            'k2': self.k2_symbol
+        }
+        
         results = solve_steady_state(
             self.equilibrium_odes,
             self.initial_guess,
-            rate_parameters=self.rate_parameters
+            rate_parameters=self.rate_parameters,
+            concentration_symbols=concentration_symbols,
+            parameter_symbols=parameter_symbols,
+            total_mass=total_mass
         )
         
         # Check that results contain expected keys
@@ -294,10 +310,6 @@ class TestSolveSteadyState(unittest.TestCase):
         self.assertIn('steady_state_concentrations', results)
         
         if results['success']:
-            # At steady state: k1*[A] = k2*[B]
-            # So [B]/[A] = k1/k2 = 0.1/0.05 = 2.0
-            # However, without mass conservation constraint, we need to check
-            # that the ODEs are actually zero at steady state
             steady_state = results['steady_state_concentrations']
             
             # Check that rates are zero (steady state condition)
@@ -305,23 +317,43 @@ class TestSolveSteadyState(unittest.TestCase):
             B_val = steady_state['B']
             k1, k2 = self.rate_parameters['k1'], self.rate_parameters['k2']
             
+            print(f"Steady state: A_val = {A_val}, B_val = {B_val}")
+            
             # Calculate the rates at steady state
             dA_dt = -k1 * A_val + k2 * B_val
             dB_dt = k1 * A_val - k2 * B_val
             
-            # These should be very close to zero
-            self.assertAlmostEqual(dA_dt, 0.0, places=6)
-            self.assertAlmostEqual(dB_dt, 0.0, places=6)
+            print(f"Derivatives: dA_dt = {dA_dt}, dB_dt = {dB_dt}")
             
-            # If both concentrations are positive, check equilibrium ratio
-            if A_val > 1e-10 and B_val > 1e-10:
+            # These should be very close to zero
+            self.assertTrue(abs(dA_dt) < 1e-6, f"dA_dt = {dA_dt} should be < 1e-6")
+            self.assertTrue(abs(dB_dt) < 1e-6, f"dB_dt = {dB_dt} should be < 1e-6")
+            
+            # Check mass conservation
+            total_concentration = A_val + B_val
+            self.assertAlmostEqual(total_concentration, total_mass, places=6)
+            
+            # Check equilibrium ratio: At steady state k1*[A] = k2*[B], so [B]/[A] = k1/k2
+            if A_val > 1e-10:
                 ratio = B_val / A_val
-                expected_ratio = k1 / k2  # = 2.0
-                self.assertAlmostEqual(ratio, expected_ratio, places=2)
+                expected_ratio = k1 / k2  # = 0.1/0.05 = 2.0
+                self.assertAlmostEqual(ratio, expected_ratio, places=3)
+        else:
+            self.fail(f"Steady state solver failed: {results.get('message', 'Unknown error')}")
 
     def test_solve_steady_state_methods(self):
         """Test different root finding methods."""
         methods = ['hybr', 'lm']
+        
+        # Define symbol dictionaries for proper symbol matching
+        concentration_symbols = {
+            'A': self.A_symbol,
+            'B': self.B_symbol
+        }
+        parameter_symbols = {
+            'k1': self.k1_symbol,
+            'k2': self.k2_symbol
+        }
         
         for method in methods:
             with self.subTest(method=method):
@@ -330,6 +362,8 @@ class TestSolveSteadyState(unittest.TestCase):
                         self.equilibrium_odes,
                         self.initial_guess,
                         rate_parameters=self.rate_parameters,
+                        concentration_symbols=concentration_symbols,
+                        parameter_symbols=parameter_symbols,
                         method=method
                     )
                     self.assertEqual(results['method'], method)
